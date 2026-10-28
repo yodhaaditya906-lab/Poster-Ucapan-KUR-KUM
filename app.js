@@ -133,12 +133,12 @@ function preloadBackgroundImages() {
 // -------------------------------------------------------------
 function initSampleData() {
   state.members = [
-    { id: 1, name: 'Bambang Sugianto', role: 'Branch Manager', photoDataUrl: null, photoImg: null },
-    { id: 2, name: 'Dewi Rahmawati', role: 'MBM (Micro Banking Mgr)', photoDataUrl: null, photoImg: null },
-    { id: 3, name: 'Arifin Parinduri', role: 'SGP Senior', photoDataUrl: null, photoImg: null },
-    { id: 4, name: 'Adetya Yandri', role: 'SGP Champion', photoDataUrl: null, photoImg: null },
-    { id: 5, name: 'Adri Fauzan', role: 'SGP Micro', photoDataUrl: null, photoImg: null },
-    { id: 6, name: 'Anisah Puspita', role: 'SGP Micro', photoDataUrl: null, photoImg: null }
+    { id: 1, name: 'Bambang Sugianto', role: 'BM', photoDataUrl: null, photoImg: null },
+    { id: 2, name: 'Dewi Rahmawati', role: 'MBM/Penyelia Unit', photoDataUrl: null, photoImg: null },
+    { id: 3, name: 'Arifin Parinduri', role: 'SGP', photoDataUrl: null, photoImg: null },
+    { id: 4, name: 'Adetya Yandri', role: 'SGP', photoDataUrl: null, photoImg: null },
+    { id: 5, name: 'Adri Fauzan', role: 'SGP', photoDataUrl: null, photoImg: null },
+    { id: 6, name: 'Anisah Puspita', role: 'SGP', photoDataUrl: null, photoImg: null }
   ];
 }
 
@@ -209,10 +209,12 @@ function renderTeamMembersInput() {
                  oninput="updateMemberName(${member.id}, this.value)">
         </div>
         <div class="field-row">
-          <input type="text" class="input-text-clean member-role-input" 
-                 placeholder="Jabatan (cth: SGP, MBM, BM)" 
-                 value="${member.role}" 
-                 oninput="updateMemberRole(${member.id}, this.value)">
+          <select class="input-text-clean member-role-input" 
+                  onchange="updateMemberRole(${member.id}, this.value)">
+            ${STANDARD_JABATAN_OPTIONS.map(opt => `
+              <option value="${escapeHtml(opt)}" ${normalizeJabatan(member.role) === opt ? 'selected' : ''}>${escapeHtml(opt)}</option>
+            `).join('')}
+          </select>
         </div>
       </div>
 
@@ -2616,18 +2618,32 @@ let activePhotoTarget = null; // { unitName, empIdx }
 const LOCAL_STORAGE_DB_KEY = 'mandiri_poster_unit_database_v2';
 
 const STANDARD_JABATAN_OPTIONS = [
-  'MBM (Micro Banking Mgr)',
-  'MKA (Mikro Kredit Analis)',
-  'SOM (Sales Officer Mikro)',
-  'Branch Manager',
-  'BGP Champion',
-  'BGP Hero',
-  'BCP Senior',
-  'CAO',
-  'MM',
-  'Penyelia Unit',
-  'Staff / CSO'
+  'MBH',
+  'BM',
+  'MBCM',
+  'MBM/Penyelia Unit',
+  'SGP'
 ];
+
+function normalizeJabatan(jabatan) {
+  if (!jabatan) return 'SGP';
+  const val = String(jabatan).trim();
+  const lower = val.toLowerCase();
+
+  if (lower === 'mbh') return 'MBH';
+  if (lower === 'bm' || lower === 'branch manager' || lower === 'business manager') return 'BM';
+  if (lower === 'mbcm' || lower.includes('cluster manager')) return 'MBCM';
+  if (
+    lower.includes('mbm') || 
+    lower.includes('penyelia') || 
+    lower === 'mm' || 
+    lower === 'km' ||
+    lower.includes('micro banking mgr')
+  ) {
+    return 'MBM/Penyelia Unit';
+  }
+  return 'SGP';
+}
 
 // Clean Vector SVG Icons
 const SVG_ICONS = {
@@ -2670,6 +2686,14 @@ async function loadUnitEmployeeDatabase() {
   if (cached) {
     try {
       unitDatabase = JSON.parse(cached);
+      // Normalisasi jabatan yang ada di cache ke 5 pilihan resmi
+      Object.keys(unitDatabase).forEach(u => {
+        if (Array.isArray(unitDatabase[u])) {
+          unitDatabase[u].forEach(emp => {
+            emp.jabatan = normalizeJabatan(emp.jabatan);
+          });
+        }
+      });
       allUnitsList = Object.keys(unitDatabase).sort((a, b) => a.localeCompare(b));
       if (allUnitsList.length > 0) {
         openUnitsSet.add(allUnitsList[0]);
@@ -2691,15 +2715,16 @@ async function loadUnitEmployeeDatabase() {
       const u = (emp.unit || '').trim();
       if (!u || u === '-') return;
       if (!unitDatabase[u]) unitDatabase[u] = [];
+      emp.jabatan = normalizeJabatan(emp.jabatan);
       unitDatabase[u].push(emp);
     });
   } catch (err) {
     console.warn('Gagal fetch employees.json, gunakan sample:', err);
     unitDatabase = {
       'Bogor Kemang 1': [
-        { nama: 'Bella Puspita Sari', jabatan: 'MBM (Micro Banking Mgr)', nip: 'BM-101', foto: null },
-        { nama: 'Bella Puspita Sari', jabatan: 'SOM (Sales Officer Mikro)', nip: 'BM-102', foto: 'saved_sample' },
-        { nama: 'Bella Puspita Sari', jabatan: 'MKA (Mikro Kredit Analis)', nip: 'BM-103', foto: null }
+        { nama: 'Bella Puspita Sari', jabatan: 'MBM/Penyelia Unit', nip: 'BM-101', foto: null },
+        { nama: 'Bella Puspita Sari', jabatan: 'SGP', nip: 'BM-102', foto: 'saved_sample' },
+        { nama: 'Bella Puspita Sari', jabatan: 'SGP', nip: 'BM-103', foto: null }
       ]
     };
   }
@@ -2844,16 +2869,11 @@ function renderUnitsAccordion(searchQuery = '') {
       const hasPhoto = Boolean(emp.foto);
 
       let roleOptionsHtml = '';
-      const currentRole = emp.jabatan || 'SOM (Sales Officer Mikro)';
-      let matched = false;
+      const currentRole = normalizeJabatan(emp.jabatan);
       STANDARD_JABATAN_OPTIONS.forEach(opt => {
-        const sel = (opt.toLowerCase() === currentRole.toLowerCase()) ? 'selected' : '';
-        if (sel) matched = true;
+        const sel = (opt === currentRole) ? 'selected' : '';
         roleOptionsHtml += `<option value="${escapeHtml(opt)}" ${sel}>${escapeHtml(opt)}</option>`;
       });
-      if (!matched && currentRole) {
-        roleOptionsHtml = `<option value="${escapeHtml(currentRole)}" selected>${escapeHtml(currentRole)}</option>` + roleOptionsHtml;
-      }
 
       const isEmpChecked = isChecked || selectedEmployeesForBulk.has(`${unitName}:::${empIdx}`);
 
@@ -2973,7 +2993,7 @@ function setupUnitManagerEventListeners() {
         unitDatabase[u].push({
           id: 'EMP-' + Date.now(),
           nama: 'Pegawai Baru',
-          jabatan: 'SOM (Sales Officer Mikro)',
+          jabatan: 'SGP',
           nip: '-',
           unit: u,
           foto: null
@@ -3189,7 +3209,7 @@ function setupUnitManagerEventListeners() {
           {
             id: 'EMP-' + Date.now(),
             nama: 'Pegawai Baru',
-            jabatan: 'SOM (Sales Officer Mikro)',
+            jabatan: 'SGP',
             nip: '-',
             unit: cleanName,
             foto: null

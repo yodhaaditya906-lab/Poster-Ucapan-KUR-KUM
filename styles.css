@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   /* Official Mandiri Brand Colors */
   --mandiri-blue: #003D79;
   --mandiri-blue-dark: #002347;
@@ -497,6 +497,11 @@ body {
   border-radius: var(--radius-sm);
   background: #FFFFFF;
   outline: none;
+}
+
+select.member-role-input {
+  cursor: pointer;
+  width: 100%;
 }
 
 .member-name-input:focus,
