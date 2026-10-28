@@ -2674,24 +2674,41 @@ function markDbChanged() {
 }
 
 function updateSaveButtonState() {
-  const btn = document.getElementById('btnSaveDbChanges');
-  const btnText = document.getElementById('btnSaveDbText');
-  const btnIcon = document.getElementById('btnSaveDbIcon');
-  if (!btn) return;
-
-  if (hasUnsavedChanges) {
-    btn.disabled = false;
-    btn.title = 'Ada perubahan belum disimpan. Klik untuk menyimpan!';
-    if (btnText) btnText.textContent = 'Simpan Perubahan';
-    if (btnIcon) {
-      btnIcon.innerHTML = `<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>`;
+  const saveButtons = document.querySelectorAll('.btn-save-unit-footer');
+  saveButtons.forEach(btn => {
+    const btnText = btn.querySelector('.save-btn-text');
+    const btnIcon = btn.querySelector('.btn-svg-icon');
+    if (hasUnsavedChanges) {
+      btn.disabled = false;
+      btn.title = 'Ada perubahan belum disimpan. Klik untuk simpan!';
+      if (btnText) btnText.textContent = 'Simpan Perubahan';
+      if (btnIcon) {
+        btnIcon.innerHTML = `<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>`;
+      }
+    } else {
+      btn.disabled = true;
+      btn.title = 'Semua perubahan sudah tersimpan';
+      if (btnText) btnText.textContent = 'Tersimpan';
+      if (btnIcon) {
+        btnIcon.innerHTML = `<polyline points="20 6 9 17 4 12"/>`;
+      }
     }
-  } else {
-    btn.disabled = true;
-    btn.title = 'Semua perubahan sudah tersimpan';
-    if (btnText) btnText.textContent = 'Tersimpan';
-    if (btnIcon) {
-      btnIcon.innerHTML = `<polyline points="20 6 9 17 4 12"/>`;
+  });
+
+  const topBtn = document.getElementById('btnSaveDbChanges');
+  if (topBtn) {
+    const topText = document.getElementById('btnSaveDbText');
+    const topIcon = document.getElementById('btnSaveDbIcon');
+    if (hasUnsavedChanges) {
+      topBtn.disabled = false;
+      topBtn.title = 'Ada perubahan belum disimpan. Klik untuk menyimpan!';
+      if (topText) topText.textContent = 'Simpan Perubahan';
+      if (topIcon) topIcon.innerHTML = `<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>`;
+    } else {
+      topBtn.disabled = true;
+      topBtn.title = 'Semua perubahan sudah tersimpan';
+      if (topText) topText.textContent = 'Tersimpan';
+      if (topIcon) topIcon.innerHTML = `<polyline points="20 6 9 17 4 12"/>`;
     }
   }
 }
@@ -2939,10 +2956,21 @@ function renderUnitsAccordion(searchQuery = '') {
     const footerWrap = document.createElement('div');
     footerWrap.className = 'unit-body-footer';
     footerWrap.innerHTML = `
-      <button type="button" class="btn-add-employee-row" data-unit="${escapeHtml(unitName)}">
-        ${SVG_ICONS.plus}
-        <span>Tambah Pegawai</span>
-      </button>
+      <div class="footer-left-actions">
+        <button type="button" class="btn-add-employee-row" data-unit="${escapeHtml(unitName)}">
+          ${SVG_ICONS.plus}
+          <span>Tambah Pegawai</span>
+        </button>
+        <button type="button" class="btn-action-save btn-save-unit-footer" data-unit="${escapeHtml(unitName)}" ${hasUnsavedChanges ? '' : 'disabled'} title="${hasUnsavedChanges ? 'Ada perubahan belum disimpan. Klik untuk simpan!' : 'Semua perubahan sudah tersimpan'}">
+          <svg class="btn-svg-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            ${hasUnsavedChanges 
+              ? '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>'
+              : '<polyline points="20 6 9 17 4 12"/>'
+            }
+          </svg>
+          <span class="save-btn-text">${hasUnsavedChanges ? 'Simpan Perubahan' : 'Tersimpan'}</span>
+        </button>
+      </div>
       <span class="unit-emp-count-text">${emps.length} Pegawai</span>
     `;
 
@@ -2965,6 +2993,18 @@ function setupUnitManagerEventListeners() {
   if (container) {
     // Click Delegations inside Accordion List
     container.addEventListener('click', (e) => {
+      // 0. Save Perubahan inside unit footer
+      const btnSaveRow = e.target.closest('.btn-save-unit-footer');
+      if (btnSaveRow) {
+        e.stopPropagation();
+        if (!hasUnsavedChanges) return;
+        saveUnitDatabase();
+        hasUnsavedChanges = false;
+        updateSaveButtonState();
+        showToast('Perubahan data berhasil disimpan!');
+        return;
+      }
+
       // 1. Edit Nama Unit
       const btnEdit = e.target.closest('.btn-unit-edit');
       if (btnEdit) {
