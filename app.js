@@ -2666,6 +2666,36 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
+let hasUnsavedChanges = false;
+
+function markDbChanged() {
+  hasUnsavedChanges = true;
+  updateSaveButtonState();
+}
+
+function updateSaveButtonState() {
+  const btn = document.getElementById('btnSaveDbChanges');
+  const btnText = document.getElementById('btnSaveDbText');
+  const btnIcon = document.getElementById('btnSaveDbIcon');
+  if (!btn) return;
+
+  if (hasUnsavedChanges) {
+    btn.disabled = false;
+    btn.title = 'Ada perubahan belum disimpan. Klik untuk menyimpan!';
+    if (btnText) btnText.textContent = 'Simpan Perubahan';
+    if (btnIcon) {
+      btnIcon.innerHTML = `<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>`;
+    }
+  } else {
+    btn.disabled = true;
+    btn.title = 'Semua perubahan sudah tersimpan';
+    if (btnText) btnText.textContent = 'Tersimpan';
+    if (btnIcon) {
+      btnIcon.innerHTML = `<polyline points="20 6 9 17 4 12"/>`;
+    }
+  }
+}
+
 function saveUnitDatabase() {
   try {
     localStorage.setItem(LOCAL_STORAGE_DB_KEY, JSON.stringify(unitDatabase));
@@ -2743,6 +2773,8 @@ function finishDbInit() {
   populateQuickUnitPicker();
   renderUnitsAccordion();
   setupUnitManagerEventListeners();
+  hasUnsavedChanges = false;
+  updateSaveButtonState();
 }
 
 function populateQuickUnitPicker() {
@@ -2960,6 +2992,7 @@ function setupUnitManagerEventListeners() {
             if (inputUnit) inputUnit.value = cleanNewUnit;
             drawPosterCanvas();
           }
+          markDbChanged();
           saveUnitDatabase();
           renderUnitsAccordion(document.getElementById('inputSearchUnitAndEmp')?.value || '');
           showToast(`Nama unit berhasil diubah menjadi "${cleanNewUnit}"`);
@@ -2977,6 +3010,7 @@ function setupUnitManagerEventListeners() {
           delete unitDatabase[u];
           openUnitsSet.delete(u);
           selectedUnitsForBulk.delete(u);
+          markDbChanged();
           saveUnitDatabase();
           renderUnitsAccordion(document.getElementById('inputSearchUnitAndEmp')?.value || '');
           showToast(`Unit "${u}" berhasil dihapus.`);
@@ -2999,6 +3033,7 @@ function setupUnitManagerEventListeners() {
           foto: null
         });
         openUnitsSet.add(u);
+        markDbChanged();
         saveUnitDatabase();
         renderUnitsAccordion(document.getElementById('inputSearchUnitAndEmp')?.value || '');
         showToast(`Pegawai baru ditambahkan ke ${u}`);
@@ -3050,6 +3085,7 @@ function setupUnitManagerEventListeners() {
         const idx = parseInt(btnRemovePhoto.dataset.idx);
         if (unitDatabase[u] && unitDatabase[u][idx]) {
           unitDatabase[u][idx].foto = null;
+          markDbChanged();
           saveUnitDatabase();
           renderUnitsAccordion(document.getElementById('inputSearchUnitAndEmp')?.value || '');
           if (state.unitName === u) {
@@ -3069,6 +3105,7 @@ function setupUnitManagerEventListeners() {
         if (unitDatabase[u] && unitDatabase[u][idx]) {
           const empName = unitDatabase[u][idx].nama || 'Pegawai';
           unitDatabase[u].splice(idx, 1);
+          markDbChanged();
           saveUnitDatabase();
           renderUnitsAccordion(document.getElementById('inputSearchUnitAndEmp')?.value || '');
           if (state.unitName === u) {
@@ -3115,6 +3152,7 @@ function setupUnitManagerEventListeners() {
         const idx = parseInt(e.target.dataset.idx);
         if (unitDatabase[u] && unitDatabase[u][idx]) {
           unitDatabase[u][idx].jabatan = e.target.value;
+          markDbChanged();
           saveUnitDatabase();
           if (state.unitName === u) {
             applyUnitToState(u);
@@ -3130,6 +3168,7 @@ function setupUnitManagerEventListeners() {
         const idx = parseInt(e.target.dataset.idx);
         if (unitDatabase[u] && unitDatabase[u][idx]) {
           unitDatabase[u][idx].nama = e.target.value;
+          markDbChanged();
           clearTimeout(window._saveEmpTimeout);
           window._saveEmpTimeout = setTimeout(() => {
             saveUnitDatabase();
@@ -3177,6 +3216,7 @@ function setupUnitManagerEventListeners() {
           const { unitName, empIdx } = activePhotoTarget;
           if (unitDatabase[unitName] && unitDatabase[unitName][empIdx]) {
             unitDatabase[unitName][empIdx].foto = compressedDataUrl;
+            markDbChanged();
             saveUnitDatabase();
             renderUnitsAccordion(document.getElementById('inputSearchUnitAndEmp')?.value || '');
             if (state.unitName === unitName) {
@@ -3216,6 +3256,7 @@ function setupUnitManagerEventListeners() {
           }
         ];
         openUnitsSet.add(cleanName);
+        markDbChanged();
         saveUnitDatabase();
         renderUnitsAccordion();
         showToast(`Unit "${cleanName}" berhasil dibuat!`);
@@ -3251,6 +3292,18 @@ function setupUnitManagerEventListeners() {
       downloadAnchor.click();
       downloadAnchor.remove();
       showToast('Data pegawai unit berhasil didownload!');
+    });
+  }
+
+  // 2b. Tombol Save Perubahan
+  const btnSaveDb = document.getElementById('btnSaveDbChanges');
+  if (btnSaveDb) {
+    btnSaveDb.addEventListener('click', () => {
+      if (!hasUnsavedChanges) return;
+      saveUnitDatabase();
+      hasUnsavedChanges = false;
+      updateSaveButtonState();
+      showToast('Perubahan data berhasil disimpan!');
     });
   }
 
@@ -3372,6 +3425,7 @@ function getTotalSelectedItemsCount() {
           selectedEmployeesForBulk.clear();
           isBulkDeleteMode = false;
           updateBulkUI();
+          markDbChanged();
           saveUnitDatabase();
           renderUnitsAccordion(document.getElementById('inputSearchUnitAndEmp')?.value || '');
           showToast(`${totalDeleted} item berhasil dihapus!`);
